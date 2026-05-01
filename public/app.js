@@ -17,7 +17,7 @@ async function loadProvider() {
     const res = await fetch('/api/config');
     const { provider } = await res.json();
     const badge = document.getElementById('providerBadge');
-    badge.textContent = provider === 'gemini' ? 'Gemini 1.5 Flash' : 'Groq Whisper';
+    badge.textContent = provider === 'gemini' ? 'Gemini 2.5 Flash-Lite' : 'Groq Whisper';
     badge.className = `provider-badge ${provider}`;
   } catch {}
 }

@@ -5,7 +5,7 @@ const fs = require('fs');
 
 const DELAY = parseInt(process.env.DELAY_BETWEEN_REQUESTS_MS || '2000');
 const MAX_RETRIES = 3;
-const MODEL = 'gemini-1.5-flash';
+const MODEL = 'gemini-2.5-flash-lite';
 
 const MIME_MAP = {
   '.mp3': 'audio/mpeg',
