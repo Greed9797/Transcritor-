@@ -11,6 +11,17 @@ const langSelect = document.getElementById('language');
 let selectedFiles = [];
 let jobsMap = {};
 
+// --- Provider badge ---
+async function loadProvider() {
+  try {
+    const res = await fetch('/api/config');
+    const { provider } = await res.json();
+    const badge = document.getElementById('providerBadge');
+    badge.textContent = provider === 'gemini' ? 'Gemini 1.5 Flash' : 'Groq Whisper';
+    badge.className = `provider-badge ${provider}`;
+  } catch {}
+}
+
 // --- File selection ---
 fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
 
@@ -172,5 +183,6 @@ clearDoneBtn.addEventListener('click', async () => {
 });
 
 // --- Init ---
+loadProvider();
 loadJobs();
 setInterval(loadJobs, 5000);
