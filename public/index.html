@@ -9,8 +9,18 @@
 <body>
   <div class="app">
     <header>
-      <h1>🎙 Audio Transcriber</h1>
-      <p class="subtitle">Transcrição em lote — <span id="providerBadge" class="provider-badge">...</span></p>
+      <div class="header-main">
+        <div>
+          <h1>🎙 Audio Transcriber</h1>
+          <p class="subtitle">Transcrição em lote — <span id="providerBadge" class="provider-badge">...</span></p>
+        </div>
+        <button id="settingsBtn" class="btn-settings" title="Configurações">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <section class="upload-zone" id="uploadZone">
@@ -51,6 +61,102 @@
         <p class="empty-state">Nenhuma transcrição ainda. Carregue arquivos acima.</p>
       </div>
     </section>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Configurações</h2>
+        <button id="settingsClose" class="btn-icon" title="Fechar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field-group">
+          <label class="field-label">Provider</label>
+          <div class="radio-group">
+            <label class="radio-option" id="optGemini">
+              <input type="radio" name="provider" value="gemini" />
+              <span class="radio-box">
+                <span class="radio-title">Gemini 2.5 Flash-Lite</span>
+                <span class="radio-desc">Recomendado — arquivos de 9.5h, sem chunks, free tier generoso</span>
+              </span>
+            </label>
+            <label class="radio-option" id="optGroq">
+              <input type="radio" name="provider" value="groq" />
+              <span class="radio-box">
+                <span class="radio-title">Groq Whisper</span>
+                <span class="radio-desc">Fallback — chunks de 20MB, ~2h/dia no free tier</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="geminiKey">
+            Gemini API Key
+            <a href="https://aistudio.google.com/apikey" target="_blank" class="field-link">Obter chave ↗</a>
+          </label>
+          <div class="key-input-wrap">
+            <input type="password" id="geminiKey" class="field-input" placeholder="AIza..." autocomplete="off" />
+            <button class="btn-eye" data-target="geminiKey" title="Mostrar/ocultar">👁</button>
+          </div>
+          <span class="field-hint" id="geminiKeyHint"></span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="groqKey">
+            Groq API Key
+            <a href="https://console.groq.com/keys" target="_blank" class="field-link">Obter chave ↗</a>
+          </label>
+          <div class="key-input-wrap">
+            <input type="password" id="groqKey" class="field-input" placeholder="gsk_..." autocomplete="off" />
+            <button class="btn-eye" data-target="groqKey" title="Mostrar/ocultar">👁</button>
+          </div>
+          <span class="field-hint" id="groqKeyHint"></span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">
+            Fallback automático
+            <span class="field-hint" style="font-size:0.75rem;color:var(--muted)">Ativa quando a cota do provider principal esgotar</span>
+          </label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="fallback" value="none" />
+              <span class="radio-box">
+                <span class="radio-title">Sem fallback</span>
+                <span class="radio-desc">Erro ao atingir cota — job vai para status de erro</span>
+              </span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="fallback" value="groq" />
+              <span class="radio-box">
+                <span class="radio-title">Fallback → Groq Whisper</span>
+                <span class="radio-desc">Se Gemini esgotar, continua com Groq automaticamente</span>
+              </span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="fallback" value="gemini" />
+              <span class="radio-box">
+                <span class="radio-title">Fallback → Gemini</span>
+                <span class="radio-desc">Se Groq esgotar, continua com Gemini automaticamente</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="delayMs">Delay entre requests (ms)</label>
+          <input type="number" id="delayMs" class="field-input" min="500" max="10000" step="500" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span id="saveStatus" class="save-status"></span>
+        <button id="saveSettingsBtn" class="btn-primary">Salvar</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

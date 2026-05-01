@@ -7,24 +7,117 @@ const jobsList = document.getElementById('jobsList');
 const statsBar = document.getElementById('statsBar');
 const clearDoneBtn = document.getElementById('clearDoneBtn');
 const langSelect = document.getElementById('language');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsClose = document.getElementById('settingsClose');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const saveStatus = document.getElementById('saveStatus');
 
 let selectedFiles = [];
 let jobsMap = {};
 
-// --- Provider badge ---
+// ── Provider badge ──────────────────────────────────────────────────────────
+
 async function loadProvider() {
   try {
     const res = await fetch('/api/config');
-    const { provider } = await res.json();
+    const cfg = await res.json();
     const badge = document.getElementById('providerBadge');
-    badge.textContent = provider === 'gemini' ? 'Gemini 2.5 Flash-Lite' : 'Groq Whisper';
-    badge.className = `provider-badge ${provider}`;
+    const labels = { gemini: 'Gemini 2.5 Flash-Lite', groq: 'Groq Whisper' };
+    badge.textContent = labels[cfg.provider] || cfg.provider;
+    badge.className = `provider-badge ${cfg.provider}`;
   } catch {}
 }
 
-// --- File selection ---
-fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
+// ── Settings modal ──────────────────────────────────────────────────────────
 
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
+
+async function openSettings() {
+  settingsOverlay.classList.remove('hidden');
+  saveStatus.textContent = '';
+  saveStatus.className = 'save-status';
+
+  try {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+
+    document.querySelector(`input[name="provider"][value="${cfg.provider}"]`).checked = true;
+
+    const fbVal = cfg.fallbackProvider || 'none';
+    const fbEl = document.querySelector(`input[name="fallback"][value="${fbVal}"]`);
+    if (fbEl) fbEl.checked = true;
+
+    if (cfg.geminiKeySet) {
+      document.getElementById('geminiKey').placeholder = cfg.geminiKeyMasked || 'Configurado';
+      document.getElementById('geminiKeyHint').textContent = 'Chave salva. Deixe em branco para manter.';
+      document.getElementById('geminiKeyHint').className = 'field-hint ok';
+    }
+    if (cfg.groqKeySet) {
+      document.getElementById('groqKey').placeholder = cfg.groqKeyMasked || 'Configurado';
+      document.getElementById('groqKeyHint').textContent = 'Chave salva. Deixe em branco para manter.';
+      document.getElementById('groqKeyHint').className = 'field-hint ok';
+    }
+
+    document.getElementById('delayMs').value = cfg.delayMs || 2000;
+  } catch (e) {
+    saveStatus.textContent = 'Erro ao carregar configurações.';
+    saveStatus.className = 'save-status err';
+  }
+}
+
+function closeSettings() {
+  settingsOverlay.classList.add('hidden');
+  document.getElementById('geminiKey').value = '';
+  document.getElementById('groqKey').value = '';
+}
+
+saveSettingsBtn.addEventListener('click', async () => {
+  saveSettingsBtn.disabled = true;
+  saveStatus.textContent = 'Salvando...';
+  saveStatus.className = 'save-status';
+
+  const provider = document.querySelector('input[name="provider"]:checked')?.value;
+  const fallbackProvider = document.querySelector('input[name="fallback"]:checked')?.value || 'none';
+  const geminiKey = document.getElementById('geminiKey').value.trim();
+  const groqKey = document.getElementById('groqKey').value.trim();
+  const delayMs = parseInt(document.getElementById('delayMs').value) || 2000;
+
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, fallbackProvider, geminiKey, groqKey, delayMs }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error('Falha ao salvar');
+
+    saveStatus.textContent = '✓ Salvo com sucesso';
+    saveStatus.className = 'save-status ok';
+    await loadProvider();
+    setTimeout(closeSettings, 1200);
+  } catch (e) {
+    saveStatus.textContent = 'Erro: ' + e.message;
+    saveStatus.className = 'save-status err';
+  } finally {
+    saveSettingsBtn.disabled = false;
+  }
+});
+
+// Eye toggle
+document.querySelectorAll('.btn-eye').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+});
+
+// ── File selection ──────────────────────────────────────────────────────────
+
+fileInput.addEventListener('change', () => handleFiles([...fileInput.files]));
 dropArea.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
 dropArea.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
 dropArea.addEventListener('drop', e => {
@@ -46,15 +139,14 @@ function renderSelectedFiles() {
     .join('');
 }
 
-// --- Upload ---
+// ── Upload ──────────────────────────────────────────────────────────────────
+
 uploadBtn.addEventListener('click', async () => {
   if (selectedFiles.length === 0) return;
   uploadBtn.disabled = true;
-
   const fd = new FormData();
   selectedFiles.forEach(f => fd.append('files', f));
   fd.append('language', langSelect.value);
-
   try {
     const res = await fetch('/api/upload', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(await res.text());
@@ -67,13 +159,17 @@ uploadBtn.addEventListener('click', async () => {
   }
 });
 
-// --- SSE live updates ---
+// ── SSE live updates ────────────────────────────────────────────────────────
+
 const es = new EventSource('/events');
 es.onmessage = e => {
   const data = JSON.parse(e.data);
 
-  if (data.type === 'job_start') {
-    loadJobs();
+  if (data.type === 'job_start') { loadJobs(); return; }
+
+  if (data.type === 'fallback_activated') {
+    showToast(`⚡ Cota ${data.from} atingida — usando ${data.to} como fallback`);
+    loadProvider();
     return;
   }
 
@@ -86,13 +182,22 @@ es.onmessage = e => {
     return;
   }
 
-  if (['job_done', 'job_error'].includes(data.type)) {
-    loadJobs();
-    return;
-  }
+  if (['job_done', 'job_error'].includes(data.type)) { loadJobs(); return; }
 };
 
-// --- Load & render jobs ---
+// ── Toast notification ──────────────────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('toast-show'));
+  setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 400); }, 4000);
+}
+
+// ── Jobs render ─────────────────────────────────────────────────────────────
+
 async function loadJobs() {
   const res = await fetch('/api/jobs');
   const jobs = await res.json();
@@ -110,17 +215,13 @@ function renderJobs(jobs) {
     clearDoneBtn.hidden = true;
     return;
   }
-
   statsBar.hidden = false;
-  const hasDone = jobs.some(j => j.status === 'done');
-  clearDoneBtn.hidden = !hasDone;
-
+  clearDoneBtn.hidden = !jobs.some(j => j.status === 'done');
   jobsList.innerHTML = jobs.map(j => cardHTML(j)).join('');
-  attachCardListeners(jobs);
 }
 
 function cardHTML(j) {
-  const statusLabel = { pending: 'Aguardando', processing: 'Processando', done: 'Concluído', error: 'Erro' }[j.status] || j.status;
+  const label = { pending: 'Aguardando', processing: 'Processando', done: 'Concluído', error: 'Erro' }[j.status] || j.status;
   const showBar = j.status === 'processing' || j.status === 'done';
   const progress = j.progress || 0;
   const meta = j.status === 'processing' && j.total_chunks > 0
@@ -131,7 +232,7 @@ function cardHTML(j) {
     <div class="job-card ${j.status}" id="card-${j.id}">
       <div class="job-top">
         <span class="job-name" title="${j.original_name}">${j.original_name}</span>
-        <span class="job-status status-${j.status}">${statusLabel}</span>
+        <span class="job-status status-${j.status}">${label}</span>
         <div class="job-actions">
           ${j.status === 'done' ? `<button class="btn-icon" title="Baixar .txt" onclick="download(${j.id})">⬇</button>` : ''}
           <button class="btn-icon danger" title="Remover" onclick="removeJob(${j.id})" ${j.status === 'processing' ? 'disabled' : ''}>✕</button>
@@ -140,8 +241,7 @@ function cardHTML(j) {
       ${showBar ? `<div class="job-progress-bar"><div class="job-progress-fill" id="fill-${j.id}" style="width:${progress}%"></div></div>` : ''}
       ${meta ? `<div class="job-meta">${meta}</div>` : ''}
       ${j.error ? `<div class="job-error-msg">Erro: ${j.error}</div>` : ''}
-    </div>
-  `;
+    </div>`;
 }
 
 function updateCardProgress(id) {
@@ -157,8 +257,6 @@ function updateCardProgress(id) {
   }
 }
 
-function attachCardListeners(jobs) {}
-
 function updateStats(jobs) {
   document.getElementById('statTotal').textContent = jobs.length;
   document.getElementById('statDone').textContent = jobs.filter(j => j.status === 'done').length;
@@ -166,10 +264,7 @@ function updateStats(jobs) {
   document.getElementById('statError').textContent = jobs.filter(j => j.status === 'error').length;
 }
 
-// --- Actions ---
-async function download(id) {
-  window.location.href = `/api/download/${id}`;
-}
+async function download(id) { window.location.href = `/api/download/${id}`; }
 
 async function removeJob(id) {
   await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
@@ -182,7 +277,8 @@ clearDoneBtn.addEventListener('click', async () => {
   loadJobs();
 });
 
-// --- Init ---
+// ── Init ────────────────────────────────────────────────────────────────────
+
 loadProvider();
 loadJobs();
 setInterval(loadJobs, 5000);
