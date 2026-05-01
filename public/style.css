@@ -1,0 +1,283 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #22263a;
+  --border: #2e3250;
+  --primary: #6c63ff;
+  --primary-hover: #5a52e0;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+  --text: #e2e8f0;
+  --muted: #7c859e;
+  --radius: 10px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.app {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+header h1 { font-size: 2rem; font-weight: 700; }
+.subtitle { color: var(--muted); margin-top: 6px; }
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.2s;
+  margin-bottom: 24px;
+}
+
+.upload-zone.drag-over {
+  border-color: var(--primary);
+  background: rgba(108, 99, 255, 0.06);
+}
+
+.upload-inner {
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-icon { font-size: 3rem; }
+
+.hint { font-size: 0.8rem; color: var(--muted); }
+
+.btn-link {
+  color: var(--primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.upload-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+
+.selected-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  max-width: 600px;
+  margin-top: 8px;
+}
+
+.file-tag {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Stats */
+.stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+
+.stat span { display: block; font-size: 1.8rem; font-weight: 700; }
+.stat small { color: var(--muted); font-size: 0.8rem; }
+.stat.success span { color: var(--success); }
+.stat.processing span { color: var(--primary); }
+.stat.error span { color: var(--error); }
+
+/* Jobs */
+.jobs-section { }
+
+.jobs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.jobs-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+.jobs-list { display: flex; flex-direction: column; gap: 10px; }
+
+.empty-state { color: var(--muted); text-align: center; padding: 40px; }
+
+/* Job card */
+.job-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color 0.2s;
+}
+
+.job-card.processing { border-color: var(--primary); }
+.job-card.done { border-color: var(--success); }
+.job-card.error { border-color: var(--error); }
+
+.job-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.job-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.job-status {
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-pending { background: rgba(124,133,158,0.15); color: var(--muted); }
+.status-processing { background: rgba(108,99,255,0.15); color: var(--primary); }
+.status-done { background: rgba(34,197,94,0.15); color: var(--success); }
+.status-error { background: rgba(239,68,68,0.15); color: var(--error); }
+
+.job-actions { display: flex; gap: 8px; align-items: center; }
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: border-color 0.2s, color 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.btn-icon:hover { border-color: var(--primary); color: var(--primary); }
+.btn-icon.danger:hover { border-color: var(--error); color: var(--error); }
+.btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.job-progress-bar {
+  margin-top: 12px;
+  background: var(--surface2);
+  border-radius: 4px;
+  height: 6px;
+  overflow: hidden;
+}
+
+.job-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+
+.job-card.done .job-progress-fill { background: var(--success); }
+
+.job-meta {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.job-error-msg {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--error);
+  background: rgba(239,68,68,0.08);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+@media (max-width: 540px) {
+  .stats { flex-wrap: wrap; }
+  .stat { flex: 1 1 calc(50% - 6px); }
+  .upload-controls { flex-direction: column; }
+}
