@@ -17,46 +17,42 @@ function getProvider() {
   const forced = (process.env.TRANSCRIPTION_PROVIDER || '').toLowerCase();
   if (forced === 'groq') return 'groq';
   if (forced === 'gemini') return 'gemini';
-  if (process.env.GEMINI_API_KEY) return 'gemini';
+  if (process.env.GEMINI_API_KEY_1 || process.env.GEMINI_API_KEY) return 'gemini';
   return 'groq';
 }
 
 function getFallbackProvider() {
   const fb = (process.env.FALLBACK_PROVIDER || '').toLowerCase();
-  if (fb === 'groq' || fb === 'gemini' || fb === 'none') return fb;
-  return 'none';
+  return (fb === 'groq' || fb === 'gemini') ? fb : 'none';
 }
 
 function getClientForProvider(provider) {
-  return provider === 'gemini'
-    ? require('./gemini-client')
-    : require('./groq-client');
+  return provider === 'gemini' ? require('./gemini-client') : require('./groq-client');
 }
 
 function isQuotaError(err) {
   return err?.status === 429 || /quota|rate.?limit|exceeded/i.test(err?.message || '');
 }
 
-// ── .env read/write ───────────────────────────────────────────────────────────
+// ── .env read/write ──────────────────────────────��────────────────────────────
 
 function readEnvFile() {
   if (!fs.existsSync(ENV_PATH)) return {};
-  const lines = fs.readFileSync(ENV_PATH, 'utf8').split('\n');
   const result = {};
-  for (const line of lines) {
-    const m = line.match(/^([A-Z_]+)=(.*)$/);
+  for (const line of fs.readFileSync(ENV_PATH, 'utf8').split('\n')) {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (m) result[m[1]] = m[2];
   }
   return result;
 }
 
 function writeEnvFile(vars) {
-  const existing = readEnvFile();
-  const merged = { ...existing, ...vars };
-  const content = Object.entries(merged)
-    .map(([k, v]) => `${k}=${v}`)
-    .join('\n') + '\n';
-  fs.writeFileSync(ENV_PATH, content, 'utf8');
+  const merged = { ...readEnvFile(), ...vars };
+  // Remove keys explicitly set to null
+  for (const [k, v] of Object.entries(vars)) {
+    if (v === null) delete merged[k];
+  }
+  fs.writeFileSync(ENV_PATH, Object.entries(merged).map(([k, v]) => `${k}=${v}`).join('\n') + '\n', 'utf8');
 }
 
 function maskKey(key) {
@@ -64,7 +60,21 @@ function maskKey(key) {
   return key.slice(0, 4) + '****' + key.slice(-4);
 }
 
-// ── Express setup ─────────────────────────────────────────────────────────────
+function getGeminiKeysFromEnv(env) {
+  const keys = [];
+  let i = 1;
+  while (env[`GEMINI_API_KEY_${i}`]) {
+    keys.push({ index: i, masked: maskKey(env[`GEMINI_API_KEY_${i}`]) });
+    i++;
+  }
+  // legacy single key
+  if (keys.length === 0 && env.GEMINI_API_KEY) {
+    keys.push({ index: 0, masked: maskKey(env.GEMINI_API_KEY) });
+  }
+  return keys;
+}
+
+// ── Express setup ─────────────────────────────��───────────────────────────────
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -82,7 +92,7 @@ function broadcast(data) {
   sseClients.forEach(res => res.write(msg));
 }
 
-// ── SSE ───────────────────────────────────────────────────────────────────────
+// ── SSE ────────────────────────────���───────────────────���──────────────────────
 
 app.get('/events', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
@@ -93,44 +103,66 @@ app.get('/events', (req, res) => {
   req.on('close', () => sseClients.delete(res));
 });
 
-// ── Config API ────────────────────────────────────────────────────────────────
+// ── Config API ─────────────────────────────────��─────────────────────────��────
 
 app.get('/api/config', (req, res) => {
   const env = readEnvFile();
   res.json({
     provider: getProvider(),
     fallbackProvider: getFallbackProvider(),
-    geminiKeySet: !!env.GEMINI_API_KEY,
+    geminiKeys: getGeminiKeysFromEnv(env),
     groqKeySet: !!env.GROQ_API_KEY,
-    geminiKeyMasked: maskKey(env.GEMINI_API_KEY),
     groqKeyMasked: maskKey(env.GROQ_API_KEY),
     delayMs: parseInt(env.DELAY_BETWEEN_REQUESTS_MS || '2000'),
   });
 });
 
 app.post('/api/config', (req, res) => {
-  const { provider, fallbackProvider, geminiKey, groqKey, delayMs } = req.body;
+  const { provider, fallbackProvider, geminiKeys, groqKey, delayMs } = req.body;
   const updates = {};
 
   if (provider) updates.TRANSCRIPTION_PROVIDER = provider;
   if (fallbackProvider !== undefined) updates.FALLBACK_PROVIDER = fallbackProvider;
-  if (geminiKey && geminiKey.trim()) updates.GEMINI_API_KEY = geminiKey.trim();
   if (groqKey && groqKey.trim()) updates.GROQ_API_KEY = groqKey.trim();
   if (delayMs) updates.DELAY_BETWEEN_REQUESTS_MS = String(delayMs);
 
+  // geminiKeys: array of strings (new values) or null slots (delete)
+  if (Array.isArray(geminiKeys)) {
+    const env = readEnvFile();
+    // Clear all existing numbered keys first
+    let i = 1;
+    while (env[`GEMINI_API_KEY_${i}`]) {
+      updates[`GEMINI_API_KEY_${i}`] = null; // mark for deletion
+      i++;
+    }
+    // Legacy single key
+    if (env.GEMINI_API_KEY) updates.GEMINI_API_KEY = null;
+
+    // Write new keys
+    let idx = 1;
+    for (const k of geminiKeys) {
+      if (k && k.trim()) {
+        updates[`GEMINI_API_KEY_${idx}`] = k.trim();
+        process.env[`GEMINI_API_KEY_${idx}`] = k.trim();
+        idx++;
+      }
+    }
+  }
+
   writeEnvFile(updates);
 
-  // Reload into process.env
-  for (const [k, v] of Object.entries(updates)) process.env[k] = v;
+  for (const [k, v] of Object.entries(updates)) {
+    if (v === null) delete process.env[k];
+    else process.env[k] = v;
+  }
 
-  // Bust require cache so next processQueue picks up new keys
   delete require.cache[require.resolve('./gemini-client')];
   delete require.cache[require.resolve('./groq-client')];
 
   res.json({ ok: true, provider: getProvider(), fallbackProvider: getFallbackProvider() });
 });
 
-// ── Jobs API ──────────────────────────────────────────────────────────────────
+// ── Jobs API ────────────────────────────────────────────────────��─────────────
 
 app.get('/api/jobs', (req, res) => res.json(getAllJobs()));
 
@@ -162,16 +194,22 @@ app.post('/api/upload', upload.array('files'), async (req, res) => {
   processQueue(language);
 });
 
-// ── Queue processor ───────────────────────────────────────────────────────────
+// ── Queue processor ────────────────────────────────────────────────────────��──
 
 async function transcribeWithFallback(filesToTranscribe, provider, onChunkDone, language) {
+  const geminiOpts = {
+    onKeyExhausted: (ki, total) => {
+      broadcast({ type: 'gemini_key_rotation', keyIndex: ki + 1, total });
+    },
+  };
+
   try {
     const { transcribeFile } = getClientForProvider(provider);
-    return await transcribeFile(filesToTranscribe, onChunkDone, language);
+    return await transcribeFile(filesToTranscribe, onChunkDone, language, geminiOpts);
   } catch (err) {
     const fallback = getFallbackProvider();
     if (isQuotaError(err) && fallback && fallback !== 'none' && fallback !== provider) {
-      console.warn(`[server] ${provider} quota hit — switching to fallback: ${fallback}`);
+      console.warn(`[server] ${provider} all keys exhausted — switching to fallback: ${fallback}`);
       broadcast({ type: 'fallback_activated', from: provider, to: fallback });
       const { transcribeFile } = getClientForProvider(fallback);
       return await transcribeFile(filesToTranscribe, onChunkDone, language);
@@ -219,10 +257,9 @@ async function processQueue(language = 'pt') {
           language
         );
 
-        const fullText = mergeTranscriptions(texts);
         const safeName = job.original_name.replace(/\.[^.]+$/, '').replace(/[^\w\sáéíóúâêîôûãõçÁÉÍÓÚÂÊÎÔÛÃÕÇ-]/g, '_');
         const outPath = path.join(__dirname, 'transcriptions', `${job.id}_${safeName}.txt`);
-        fs.writeFileSync(outPath, fullText, 'utf8');
+        fs.writeFileSync(outPath, mergeTranscriptions(texts), 'utf8');
 
         updateJob(job.id, { status: 'done', progress: 100, output_path: outPath });
         broadcast({ type: 'job_done', id: job.id });
@@ -241,10 +278,11 @@ async function processQueue(language = 'pt') {
 resetStuckJobs();
 
 app.listen(PORT, () => {
-  const provider = getProvider();
-  const fallback = getFallbackProvider();
+  const { getGeminiKeys } = require('./gemini-client');
+  const keys = getGeminiKeys();
   console.log(`\n🎙  Audio Transcriber — http://localhost:${PORT}`);
-  console.log(`   Provider : ${provider.toUpperCase()}`);
-  if (fallback !== 'none') console.log(`   Fallback : ${fallback.toUpperCase()}`);
+  console.log(`   Provider : ${getProvider().toUpperCase()}${keys.length > 1 ? ` (${keys.length} keys)` : ''}`);
+  const fb = getFallbackProvider();
+  if (fb !== 'none') console.log(`   Fallback : ${fb.toUpperCase()}`);
   console.log();
 });

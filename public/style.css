@@ -434,6 +434,56 @@ select {
 .save-status.ok { color: var(--success); }
 .save-status.err { color: var(--error); }
 
+/* Multi-key list */
+.field-label-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+
+#geminiKeysList { display: flex; flex-direction: column; gap: 6px; }
+
+.key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key-row .key-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.key-row .key-input-wrap { flex: 1; }
+
+.key-row .btn-remove-key {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 30px;
+  height: 38px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  transition: border-color 0.2s, color 0.2s;
+}
+.key-row .btn-remove-key:hover { border-color: var(--error); color: var(--error); }
+
+.btn-add-key {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-add-key:hover { border-color: var(--primary); color: var(--primary); }
+
 /* Toast */
 .toast {
   position: fixed;

@@ -93,15 +93,15 @@
         </div>
 
         <div class="field-group">
-          <label class="field-label" for="geminiKey">
-            Gemini API Key
-            <a href="https://aistudio.google.com/apikey" target="_blank" class="field-link">Obter chave ↗</a>
-          </label>
-          <div class="key-input-wrap">
-            <input type="password" id="geminiKey" class="field-input" placeholder="AIza..." autocomplete="off" />
-            <button class="btn-eye" data-target="geminiKey" title="Mostrar/ocultar">👁</button>
+          <div class="field-label-row">
+            <label class="field-label">
+              Gemini API Keys
+              <a href="https://aistudio.google.com/apikey" target="_blank" class="field-link">Obter chave ↗</a>
+            </label>
+            <span class="field-hint">Rotação automática entre keys quando a cota de uma esgotar</span>
           </div>
-          <span class="field-hint" id="geminiKeyHint"></span>
+          <div id="geminiKeysList"></div>
+          <button type="button" id="addGeminiKeyBtn" class="btn-add-key">+ Adicionar key</button>
         </div>
 
         <div class="field-group">

@@ -36,6 +36,54 @@ settingsClose.addEventListener('click', closeSettings);
 settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
 
+// ── Gemini key list ─────────────────────────────────────────────────────────
+
+function renderGeminiKeys(savedKeys) {
+  const list = document.getElementById('geminiKeysList');
+  list.innerHTML = '';
+
+  const rows = savedKeys.length > 0
+    ? savedKeys.map((k, i) => ({ placeholder: k.masked || 'Configurado', value: '' }))
+    : [{ placeholder: 'AIza...', value: '' }];
+
+  rows.forEach((row, i) => addKeyRow(row.placeholder, row.value, i + 1));
+}
+
+function addKeyRow(placeholder = 'AIza...', value = '', num) {
+  const list = document.getElementById('geminiKeysList');
+  const idx = num || list.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'key-row';
+  row.innerHTML = `
+    <span class="key-badge">#${idx}</span>
+    <div class="key-input-wrap">
+      <input type="password" class="field-input gemini-key-input" placeholder="${placeholder}" value="${value}" autocomplete="off" />
+      <button class="btn-eye" type="button" title="Mostrar/ocultar">👁</button>
+    </div>
+    <button class="btn-remove-key" type="button" title="Remover">✕</button>
+  `;
+
+  row.querySelector('.btn-eye').addEventListener('click', () => {
+    const inp = row.querySelector('.gemini-key-input');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  });
+
+  row.querySelector('.btn-remove-key').addEventListener('click', () => {
+    row.remove();
+    reindexKeyRows();
+  });
+
+  list.appendChild(row);
+}
+
+function reindexKeyRows() {
+  document.querySelectorAll('.key-row').forEach((row, i) => {
+    row.querySelector('.key-badge').textContent = `#${i + 1}`;
+  });
+}
+
+document.getElementById('addGeminiKeyBtn').addEventListener('click', () => addKeyRow());
+
 async function openSettings() {
   settingsOverlay.classList.remove('hidden');
   saveStatus.textContent = '';
@@ -51,11 +99,8 @@ async function openSettings() {
     const fbEl = document.querySelector(`input[name="fallback"][value="${fbVal}"]`);
     if (fbEl) fbEl.checked = true;
 
-    if (cfg.geminiKeySet) {
-      document.getElementById('geminiKey').placeholder = cfg.geminiKeyMasked || 'Configurado';
-      document.getElementById('geminiKeyHint').textContent = 'Chave salva. Deixe em branco para manter.';
-      document.getElementById('geminiKeyHint').className = 'field-hint ok';
-    }
+    renderGeminiKeys(cfg.geminiKeys || []);
+
     if (cfg.groqKeySet) {
       document.getElementById('groqKey').placeholder = cfg.groqKeyMasked || 'Configurado';
       document.getElementById('groqKeyHint').textContent = 'Chave salva. Deixe em branco para manter.';
@@ -71,7 +116,6 @@ async function openSettings() {
 
 function closeSettings() {
   settingsOverlay.classList.add('hidden');
-  document.getElementById('geminiKey').value = '';
   document.getElementById('groqKey').value = '';
 }
 
@@ -82,15 +126,19 @@ saveSettingsBtn.addEventListener('click', async () => {
 
   const provider = document.querySelector('input[name="provider"]:checked')?.value;
   const fallbackProvider = document.querySelector('input[name="fallback"]:checked')?.value || 'none';
-  const geminiKey = document.getElementById('geminiKey').value.trim();
   const groqKey = document.getElementById('groqKey').value.trim();
   const delayMs = parseInt(document.getElementById('delayMs').value) || 2000;
+
+  // Collect all gemini keys (only non-empty values)
+  const geminiKeys = [...document.querySelectorAll('.gemini-key-input')]
+    .map(inp => inp.value.trim())
+    .filter(v => v.length > 0);
 
   try {
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, fallbackProvider, geminiKey, groqKey, delayMs }),
+      body: JSON.stringify({ provider, fallbackProvider, geminiKeys, groqKey, delayMs }),
     });
     const data = await res.json();
     if (!data.ok) throw new Error('Falha ao salvar');
@@ -107,11 +155,11 @@ saveSettingsBtn.addEventListener('click', async () => {
   }
 });
 
-// Eye toggle
-document.querySelectorAll('.btn-eye').forEach(btn => {
+// Eye toggle for groq key
+document.querySelectorAll('.btn-eye[data-target]').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.target);
-    input.type = input.type === 'password' ? 'text' : 'password';
+    if (input) input.type = input.type === 'password' ? 'text' : 'password';
   });
 });
 
@@ -167,8 +215,13 @@ es.onmessage = e => {
 
   if (data.type === 'job_start') { loadJobs(); return; }
 
+  if (data.type === 'gemini_key_rotation') {
+    showToast(`🔑 Gemini key #${data.keyIndex} esgotou — rotacionando para key #${data.keyIndex + 1} de ${data.total}`);
+    return;
+  }
+
   if (data.type === 'fallback_activated') {
-    showToast(`⚡ Cota ${data.from} atingida — usando ${data.to} como fallback`);
+    showToast(`⚡ Todas as keys ${data.from} esgotadas — usando ${data.to} como fallback`);
     loadProvider();
     return;
   }
